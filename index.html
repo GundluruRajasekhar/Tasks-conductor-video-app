@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Conductor: one control desk to register, route, approve and audit AI agents from any platform.">
+<title>Conductor – AI agent control desk</title>
+<style>
+:root{--bg:#eef1f4;--ink:#14202b;--mute:#4a5a68;--line:#c3ccd5;--card:#fff;--blue:#0043ce;--green:#0b6a38;--amber:#7a4b00;--red:#a8231b;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "IBM Plex Sans","Segoe UI",system-ui,sans-serif}
+a,button,input,select{font:inherit}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.skip{position:absolute;left:-999px;background:var(--ink);color:#fff;padding:.5rem 1rem}.skip:focus{left:0;z-index:9}
+header{background:var(--ink);color:#fff;padding:2rem 1.25rem}
+header h1{margin:0 0 .25rem;font-size:clamp(1.9rem,5vw,3.2rem);letter-spacing:-.02em}
+header p{margin:0;max-width:62ch;color:#d5dde5}
+main{max-width:1100px;margin:0 auto;padding:1.25rem;display:grid;gap:1.25rem}
+section{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1.1rem}
+h2{margin:0 0 .75rem;font-size:1.2rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.75rem;margin:0;padding:0;list-style:none}
+.stats li{border-left:4px solid var(--blue);padding:.2rem .75rem}
+.stats strong{display:block;font-size:1.8rem}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px}
+caption{text-align:left;color:var(--mute);padding-bottom:.4rem}
+th,td{text-align:left;padding:.5rem;border-bottom:1px solid var(--line)}
+.tag{font-weight:600}.low{color:var(--green)}.med{color:var(--amber)}.high{color:var(--red)}
+button{background:var(--blue);color:#fff;border:0;border-radius:4px;padding:.55rem .9rem;cursor:pointer;min-height:44px}
+button.alt{background:#fff;color:var(--blue);border:2px solid var(--blue)}
+button.bad{background:var(--red)}
+button:hover{filter:brightness(1.12)}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.8rem;align-items:end}
+label{display:grid;gap:.25rem;font-weight:600}
+input,select{padding:.55rem;border:2px solid #6b7b89;border-radius:4px;min-height:44px;background:#fff;color:var(--ink)}
+.full{grid-column:1/-1}
+ul.log,ul.q{margin:0;padding:0;list-style:none;display:grid;gap:.5rem}
+ul.log li,ul.q li{border:1px solid var(--line);border-radius:4px;padding:.6rem .8rem;display:flex;gap:.75rem;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.empty{color:var(--mute)}
+#err{color:var(--red);font-weight:600;min-height:1.5rem}
+pre{white-space:pre-wrap;margin:.5rem 0 0}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+<header>
+  <h1>Conductor</h1>
+  <p>One control desk for every AI agent, wherever it was built or runs. Route work, cap spend, approve risky actions and keep an audit trail.</p>
+</header>
+<main id="main" tabindex="-1">
+  <section aria-labelledby="h-stats">
+    <h2 id="h-stats">Value at a glance</h2>
+    <ul class="stats" id="stats"></ul>
+  </section>
+
+  <section aria-labelledby="h-reg">
+    <h2 id="h-reg">Agent registry</h2>
+    <div class="wrap"><table>
+      <caption>Agents registered across platforms. Pause an agent to stop it receiving work.</caption>
+      <thead><tr><th scope="col">Agent</th><th scope="col">Runs on</th><th scope="col">Skill</th><th scope="col">Risk</th><th scope="col">Net value / month</th><th scope="col">Status</th></tr></thead>
+      <tbody id="reg"></tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="h-run">
+    <h2 id="h-run">Send a task</h2>
+    <form id="f" novalidate>
+      <label>Skill needed
+        <select id="skill" required></select>
+      </label>
+      <label>Estimated cost ($)
+        <input id="cost" type="number" min="0" max="1000" step="1" value="20" required aria-describedby="err">
+      </label>
+      <label>Monthly spend cap per agent ($)
+        <input id="cap" type="number" min="1" max="100000" step="1" value="400" required>
+      </label>
+      <label>Require approval from risk level
+        <select id="appr"><option value="high">High only</option><option value="med">Medium and high</option><option value="low">Every task</option></select>
+      </label>
+      <label class="full">Task description
+        <input id="desc" type="text" maxlength="120" autocomplete="off" required placeholder="Example: Summarise open invoices for Q3">
+      </label>
+      <div class="full"><button type="submit">Route task</button> <span id="err" role="alert"></span></div>
+    </form>
+  </section>
+
+  <section aria-labelledby="h-q">
+    <h2 id="h-q">Approval queue</h2>
+    <ul class="q" id="q" aria-live="polite"></ul>
+  </section>
+
+  <section aria-labelledby="h-log">
+    <h2 id="h-log">Audit trail</h2>
+    <ul class="log" id="log" aria-live="polite"></ul>
+  </section>
+
+  <section aria-labelledby="h-d">
+    <h2 id="h-d">Demo script (3 minutes)</h2>
+    <details>
+      <summary>Show the timed script</summary>
+      <ol>
+        <li><strong>0:00–0:15 Hook.</strong> Agents are scattered across platforms and nobody sees cost, permissions or approvals. One conductor fixes that.</li>
+        <li><strong>0:15–0:45 Problem.</strong> Agent sprawl, overspending and no accountability for risky actions.</li>
+        <li><strong>0:45–1:45 Demo.</strong> Registry, send a Finance task, approve an HR task, hit the spend cap, try a paused agent, read the audit trail.</li>
+        <li><strong>1:45–2:20 Technical.</strong> Four files, strict content security policy, validated input, accessible, 15 self-tests.</li>
+        <li><strong>2:20–2:45 Innovation.</strong> Next: real watsonx Orchestrate APIs, role-based approvals, saved audit trail.</li>
+        <li><strong>2:45–3:00 Closing.</strong> Value you can see, spend you can control, decisions you can audit.</li>
+      </ol>
+      <p>The full spoken script is in readme.md.</p>
+    </details>
+  </section>
+
+  <section aria-labelledby="h-t">
+    <h2 id="h-t">Self-tests</h2>
+    <button class="alt" id="runtests" type="button">Run self-tests</button>
+    <pre id="tout" role="status" aria-live="polite"></pre>
+  </section>
+</main>
+<script>
+'use strict';
+const RANK = { low: 0, med: 1, high: 2 };
+const RISK_LABEL = { low: 'Low', med: 'Medium', high: 'High' };
+let agents = [
+  { id: 1, name: 'Invoice Reader', origin: 'watsonx Orchestrate', skill: 'Finance', risk: 'med', cost: 180, value: 900, status: 'active' },
+  { id: 2, name: 'Ticket Triage', origin: 'Custom Python', skill: 'Support', risk: 'low', cost: 90, value: 640, status: 'active' },
+  { id: 3, name: 'Offer Letter Drafter', origin: 'Third-party SaaS', skill: 'HR', risk: 'high', cost: 150, value: 420, status: 'active' },
+  { id: 4, name: 'Lead Enricher', origin: 'LangChain', skill: 'Sales', risk: 'low', cost: 120, value: 510, status: 'paused' },
+  { id: 5, name: 'Refund Checker', origin: 'watsonx Orchestrate', skill: 'Support', risk: 'high', cost: 60, value: 300, status: 'active' }
+];
+let spend = {}, queue = [], log = [], nextId = 1;
+
+/* ---- pure logic (unit-tested) ---- */
+function sanitize(s) {
+  return String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+}
+function netValue(a) { return a.value - a.cost; }
+function route(list, skill) {
+  const c = list.filter(a => a.status === 'active' && a.skill === skill);
+  return c.length ? c.reduce((b, a) => (netValue(a) > netValue(b) ? a : b)) : null;
+}
+function decide(agent, used, est, cap, approveFrom) {
+  if (!agent) return 'rejected';
+  if (used + est > cap) return 'blocked';
+  return RANK[agent.risk] >= RANK[approveFrom] ? 'pending' : 'approved';
+}
+function validate(skill, est, cap, desc) {
+  if (!desc) return 'Describe the task in a few words.';
+  if (!Number.isFinite(est) || est < 0 || est > 1000) return 'Estimated cost must be between 0 and 1000.';
+  if (!Number.isFinite(cap) || cap < 1 || cap > 100000) return 'Spend cap must be between 1 and 100000.';
+  if (!skill) return 'Choose a skill.';
+  return '';
+}
+
+/* ---- safe DOM helpers: textContent only, never innerHTML ---- */
+function el(tag, text, cls) {
+  const n = document.createElement(tag);
+  if (text != null) n.textContent = text;
+  if (cls) n.className = cls;
+  return n;
+}
+const $ = id => document.getElementById(id);
+const money = n => '$' + n.toLocaleString('en-US');
+
+function addLog(msg) { log.unshift({ id: nextId++, msg, t: new Date().toLocaleTimeString() }); log = log.slice(0, 50); }
+
+function render() {
+  const active = agents.filter(a => a.status === 'active');
+  const net = active.reduce((s, a) => s + netValue(a), 0);
+  const st = $('stats'); st.replaceChildren();
+  [[money(net), 'Net value per month'], [active.length + ' of ' + agents.length, 'Agents active'], [String(queue.length), 'Waiting for approval']].forEach(([v, l]) => {
+    const li = el('li'); li.append(el('strong', v), el('span', l)); st.append(li);
+  });
+
+  const reg = $('reg'); reg.replaceChildren();
+  agents.forEach(a => {
+    const tr = el('tr');
+    tr.append(el('th', a.name), el('td', a.origin), el('td', a.skill), el('td', RISK_LABEL[a.risk], 'tag ' + a.risk), el('td', money(netValue(a))));
+    scope(tr.firstChild);
+    const td = el('td'); const b = el('button', a.status === 'active' ? 'Pause' : 'Resume', 'alt');
+    b.type = 'button'; b.setAttribute('aria-label', (a.status === 'active' ? 'Pause ' : 'Resume ') + a.name + '. Currently ' + a.status);
+    b.addEventListener('click', () => {
+      a.status = a.status === 'active' ? 'paused' : 'active';
+      addLog(a.name + (a.status === 'active' ? ' resumed.' : ' paused.')); render(); focusBtn(a.id);
+    });
+    b.dataset.agent = a.id; td.append(el('span', a.status + ' ', 'tag'), b); tr.append(td); reg.append(tr);
+  });
+
+  const q = $('q'); q.replaceChildren();
+  if (!queue.length) q.append(el('li', 'Nothing waiting. Risky tasks appear here for a human decision.', 'empty'));
+  queue.forEach(item => {
+    const li = el('li'); li.append(el('span', item.agent.name + ': ' + item.desc + ' (' + money(item.est) + ')'));
+    const box = el('span');
+    const ok = el('button', 'Approve'); ok.type = 'button'; ok.setAttribute('aria-label', 'Approve ' + item.desc);
+    const no = el('button', 'Reject', 'bad'); no.type = 'button'; no.setAttribute('aria-label', 'Reject ' + item.desc);
+    ok.addEventListener('click', () => resolve(item, true)); no.addEventListener('click', () => resolve(item, false));
+    box.append(ok, ' ', no); li.append(box); q.append(li);
+  });
+
+  const lg = $('log'); lg.replaceChildren();
+  if (!log.length) lg.append(el('li', 'No activity yet. Send a task to start the trail.', 'empty'));
+  log.forEach(e => { const li = el('li'); li.append(el('span', e.msg), el('time', e.t)); lg.append(li); });
+}
+function scope(n) { if (n) n.setAttribute('scope', 'row'); }
+function focusBtn(id) { const b = document.querySelector('button[data-agent="' + id + '"]'); if (b) b.focus(); }
+
+function resolve(item, yes) {
+  queue = queue.filter(x => x !== item);
+  if (yes) { spend[item.agent.id] = (spend[item.agent.id] || 0) + item.est; }
+  addLog((yes ? 'Approved: ' : 'Rejected: ') + item.agent.name + ' for "' + item.desc + '".'); render();
+  $('f').querySelector('button').focus();
+}
+
+function submit(ev) {
+  ev.preventDefault();
+  const skill = $('skill').value, est = Number($('cost').value), cap = Number($('cap').value);
+  const desc = sanitize($('desc').value), msg = validate(skill, est, cap, desc);
+  $('err').textContent = msg; if (msg) return;
+  const agent = route(agents, skill);
+  const outcome = decide(agent, agent ? (spend[agent.id] || 0) + agent.cost : 0, est, cap, $('appr').value);
+  const text = { rejected: 'No active agent has the "' + skill + '" skill. Resume one in the registry.', blocked: agent && agent.name + ' would pass the ' + money(cap) + ' cap. Raise the cap or choose another skill.', pending: agent && agent.name + ' needs approval for "' + desc + '".', approved: agent && agent.name + ' ran "' + desc + '".' }[outcome];
+  if (outcome === 'approved') spend[agent.id] = (spend[agent.id] || 0) + est;
+  if (outcome === 'pending') queue.push({ agent, desc, est });
+  addLog(outcome === 'approved' ? 'Approved: ' + text : outcome === 'pending' ? 'Waiting: ' + text : 'Stopped: ' + text);
+  $('desc').value = ''; render(); $('desc').focus();
+}
+
+/* ---- self-tests ---- */
+function runTests() {
+  const T = [], ok = (n, c) => T.push([n, !!c]);
+  const base = [{ id: 1, skill: 'A', risk: 'low', cost: 10, value: 50, status: 'active' }, { id: 2, skill: 'A', risk: 'high', cost: 10, value: 90, status: 'active' }, { id: 3, skill: 'B', risk: 'low', cost: 1, value: 9, status: 'paused' }];
+  ok('route picks highest net value', route(base, 'A').id === 2);
+  ok('route skips paused agents', route(base, 'B') === null);
+  ok('route returns null for unknown skill', route(base, 'Z') === null);
+  ok('decide rejects with no agent', decide(null, 0, 1, 10, 'high') === 'rejected');
+  ok('decide blocks over cap', decide(base[0], 95, 10, 100, 'high') === 'blocked');
+  ok('decide asks approval for high risk', decide(base[1], 0, 1, 100, 'high') === 'pending');
+  ok('decide approves low risk', decide(base[0], 0, 1, 100, 'high') === 'approved');
+  ok('decide approval threshold "low" catches all', decide(base[0], 0, 1, 100, 'low') === 'pending');
+  ok('sanitize strips angle brackets', sanitize('<img src=x onerror=1>') .indexOf('<') === -1);
+  ok('sanitize caps length at 120', sanitize('a'.repeat(500)).length === 120);
+  ok('sanitize handles null', sanitize(null) === '');
+  ok('netValue subtracts cost', netValue(base[0]) === 40);
+  ok('validate rejects empty description', validate('A', 1, 1, '') !== '');
+  ok('validate rejects NaN cost', validate('A', NaN, 1, 'x') !== '');
+  ok('validate accepts good input', validate('A', 5, 100, 'x') === '');
+  const pass = T.filter(t => t[1]).length;
+  $('tout').textContent = pass + ' of ' + T.length + ' tests passed.\n' + T.map(t => (t[1] ? 'PASS  ' : 'FAIL  ') + t[0]).join('\n');
+}
+
+/* ---- init ---- */
+[...new Set(agents.map(a => a.skill))].forEach(s => { const o = el('option', s); o.value = s; $('skill').append(o); });
+$('f').addEventListener('submit', submit);
+$('runtests').addEventListener('click', runTests);
+addLog('Control desk started with ' + agents.length + ' agents.');
+render();
+</script>
+</body>
+</html>
